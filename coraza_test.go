@@ -5,6 +5,7 @@ package coraza
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddytest"
 	"github.com/stretchr/testify/require"
@@ -348,4 +350,28 @@ func TestResponseBody(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestModuleCleanup(t *testing.T) {
+	// Test that the Cleanup method can be called without panic
+	// and properly clears references
+	m := &corazaModule{
+		Directives: `SecAction "id:1,pass,log"`,
+	}
+
+	// Simulate Caddy's module lifecycle
+	ctx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	defer cancel()
+
+	// Provision the module
+	err := m.Provision(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, m.waf, "WAF should be initialized after Provision")
+	require.NotNil(t, m.logger, "Logger should be initialized after Provision")
+
+	// Call Cleanup
+	err = m.Cleanup()
+	require.NoError(t, err)
+	require.Nil(t, m.waf, "WAF should be nil after Cleanup")
+	require.Nil(t, m.logger, "Logger should be nil after Cleanup")
 }
